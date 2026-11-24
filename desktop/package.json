@@ -1,0 +1,21 @@
+{
+  "name": "floating-clawd",
+  "version": "0.1.0",
+  "description": "A floating pixel Clawd with a glass to-do list for today",
+  "private": true,
+  "type": "module",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "vitest run",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.119.2"
+  },
+  "devDependencies": {
+    "electron": "^45.4.1",
+    "electron-builder": "^26.18.0",
+    "vitest": "^5.1.1"
+  }
+}
