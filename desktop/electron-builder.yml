@@ -1,0 +1,21 @@
+appId: com.floatingclawd.desktop
+productName: Floating Clawd
+copyright: Floating Clawd
+directories:
+  output: dist
+files:
+  - package.json
+  - src/**/*
+  - assets/**/*
+  - "!assets/icon.png"
+extraResources:
+  # Your Supabase URL + anon key, if present, ship inside the installer (never commit this file).
+  - from: config.local.json
+    to: config.local.json
+win:
+  target: nsis
+  icon: assets/icon.ico
+nsis:
+  oneClick: true
+  perMachine: false
+  shortcutName: Floating Clawd

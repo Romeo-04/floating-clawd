@@ -8,7 +8,8 @@
   "scripts": {
     "start": "node scripts/start.cjs",
     "test": "vitest run",
-    "dist": "electron-builder"
+    "dist": "electron-builder --win",
+    "icon": "node scripts/make-icon.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.2"
