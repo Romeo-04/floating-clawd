@@ -10,7 +10,7 @@ export const COLORS = {
 // Grid cells span x -3..18 and y -4..9.
 export const SPRITE_BOX = { minX: -3, minY: -4, w: 22, h: 14 };
 
-export function clawdPixels(mood) {
+export function clawdPixels(mood, { blink = false } = {}) {
   const px = new Map();
   const put = (x, y, k) => px.set(`${x},${y}`, k);
 
@@ -44,7 +44,7 @@ export function clawdPixels(mood) {
       put(16, 4, 'y'); put(-2, 3, 'Y'); put(7, -3, 'y'); put(9, -4, 'Y');
       break;
     case 'typing':
-      vert(1);
+      if (blink) line(4); else vert(1);
       for (let y = 5; y < 9; y++) for (let x = 1; x < 9; x++) put(x, y, 'k');
       for (let x = 0; x < 10; x++) put(x, 9, 'K');
       put(4, 6, 'w'); put(5, 7, 'w'); put(6, 7, 'w');
@@ -65,16 +65,16 @@ export function clawdPixels(mood) {
       vert();
       for (const [x, y] of [[16, -1], [15, 0], [16, 0], [15, 1], [16, 1]]) put(x, y, 'b');
       break;
-    default: vert();
+    default: if (blink) line(3); else vert();
   }
   return px;
 }
 
 export const spriteHeight = widthPx => Math.round((widthPx * SPRITE_BOX.h) / SPRITE_BOX.w);
 
-export function spriteSVG(mood, widthPx) {
+export function spriteSVG(mood, widthPx, opts) {
   let rects = '';
-  for (const [key, col] of clawdPixels(mood)) {
+  for (const [key, col] of clawdPixels(mood, opts)) {
     const [x, y] = key.split(',');
     rects += `<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="${COLORS[col]}"/>`;
   }

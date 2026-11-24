@@ -51,3 +51,15 @@ describe('sprite', () => {
     expect(spriteSVG('idle', 144)).toContain('width="144"');
   });
 });
+
+describe('blink overlay', () => {
+  it('closes the eyes but keeps the laptop while typing', () => {
+    const px = clawdPixels('typing', { blink: true });
+    expect(px.get('2,6')).toBe('k');          // laptop still there
+    expect(px.get('3,4')).toBe('e');          // eye line
+    expect(px.get('4,3')).toBe('o');          // open eye pixel back to body
+  });
+  it('idle blink matches the blink frame', () => {
+    expect([...clawdPixels('idle', { blink: true })]).toEqual([...clawdPixels('blink')]);
+  });
+});

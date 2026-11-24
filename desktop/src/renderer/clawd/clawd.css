@@ -1,0 +1,26 @@
+/* Window padding must match windows.js: 8px sides, 18px top (hop room), 8px bottom (shadow). */
+body { width: 100vw; height: 100vh; }
+#stage { position: absolute; left: 8px; top: 18px; }
+#sprite { line-height: 0; }
+#sprite svg { display: block; }
+
+#shadow {
+  position: absolute; left: 12%; right: 12%; bottom: -5px; height: 6px; border-radius: 50%;
+  background: rgba(26,20,16,.28); filter: blur(2px);
+}
+
+#bob { animation: bob 1.2s steps(2) infinite; }
+#hop.once { animation: hop .9s steps(3) 1; }
+#hop.loop { animation: hop .9s steps(3) infinite; }
+@keyframes bob { 50% { transform: translateY(-3px); } }
+@keyframes hop { 33% { transform: translateY(-8px); } 66% { transform: translateY(-3px); } }
+
+/* Celebrate sparkles twinkle by stepping the sprite's opacity on the accent pixels only. */
+#sprite.celebrate rect[fill="#F7C96B"], #sprite.celebrate rect[fill="#F29E6B"] { animation: twinkle .6s steps(2) infinite; }
+@keyframes twinkle { 50% { opacity: .25; } }
+
+#stage.dragging #bob, #stage.dragging #hop { animation: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  #bob, #hop.once, #hop.loop, #sprite.celebrate rect { animation: none !important; }
+}

@@ -1,0 +1,21 @@
+/* Floating Clawd design tokens — mirrors design/mockup.html */
+@font-face { font-family: 'Figtree'; font-weight: 400; src: url('../../assets/fonts/figtree-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Figtree'; font-weight: 500; src: url('../../assets/fonts/figtree-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Figtree'; font-weight: 600; src: url('../../assets/fonts/figtree-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Figtree'; font-weight: 700; src: url('../../assets/fonts/figtree-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Silkscreen'; font-weight: 400; src: url('../../assets/fonts/silkscreen-latin-400-normal.woff2') format('woff2'); }
+
+:root {
+  /* Clawd */
+  --clawd: #D97757; --clawd-shade: #B85C3E; --clawd-hi: #E58A68; --ink: #1A1410;
+  /* Text on dark glass */
+  --cream: #F5EFE6; --cream-2: rgba(245,239,230,.66); --cream-3: rgba(245,239,230,.40); --cream-line: rgba(245,239,230,.12);
+  /* Glass */
+  --glass-dark: linear-gradient(180deg, rgba(46,36,30,.68), rgba(28,22,19,.60));
+  --glass-edge-dark: rgba(255,240,225,.16);
+  --ui: 'Figtree', "Segoe UI Variable", system-ui, sans-serif;
+  --px: 'Silkscreen', ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: transparent; overflow: hidden; user-select: none; }
