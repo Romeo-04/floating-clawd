@@ -7,7 +7,7 @@
 
 :root {
   /* Clawd */
-  --clawd: #D97757; --clawd-shade: #B85C3E; --clawd-hi: #E58A68; --ink: #1A1410;
+  --clawd: #D97757; --clawd-shade: #B85C3E; --clawd-hi: #E58A68; --clawd-rgb: 217,119,87; --ink: #1A1410;
   /* Text on dark glass */
   --cream: #F5EFE6; --cream-2: rgba(245,239,230,.66); --cream-3: rgba(245,239,230,.40); --cream-line: rgba(245,239,230,.12);
   /* Glass */
@@ -15,6 +15,13 @@
   --glass-edge-dark: rgba(255,240,225,.16);
   --ui: 'Figtree', "Segoe UI Variable", system-ui, sans-serif;
   --px: 'Silkscreen', ui-monospace, monospace;
+}
+
+/* Pink Clawd: same roles, pink accents and a rose-tinted glass. Keep in sync with PALETTES in core/sprite.js. */
+:root[data-color="pink"] {
+  --clawd: #E98BB0; --clawd-shade: #C8668F; --clawd-hi: #F4AECA; --clawd-rgb: 233,139,176;
+  --glass-dark: linear-gradient(180deg, rgba(52,30,41,.68), rgba(32,19,26,.60));
+  --glass-edge-dark: rgba(255,225,238,.16);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }

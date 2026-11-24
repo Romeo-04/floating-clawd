@@ -27,8 +27,18 @@ let errorTimer = null;
 
 document.querySelectorAll('[data-icon]').forEach(el => { el.innerHTML = icon(el.dataset.icon, 16); });
 $('power').addEventListener('click', () => api.quit());
-$('empty-clawd').innerHTML = spriteSVG('idle', 56);
-$('auth-clawd').innerHTML = spriteSVG('sleepy', 88);
+function drawClawds(color) {
+  $('empty-clawd').innerHTML = spriteSVG('idle', 56, { color });
+  $('auth-clawd').innerHTML = spriteSVG('sleepy', 88, { color });
+}
+drawClawds('orange');
+const swatches = [...document.querySelectorAll('.swatch')];
+swatches.forEach(b => b.addEventListener('click', () => api.setColor(b.dataset.color)));
+api.onColor(color => {
+  document.documentElement.dataset.color = color;
+  drawClawds(color);
+  swatches.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.color === color)));
+});
 
 // ---------- helpers ----------
 function headerDate(d = new Date()) {

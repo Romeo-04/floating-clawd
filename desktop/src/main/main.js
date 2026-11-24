@@ -9,7 +9,8 @@ import { TaskSync } from './sync.js';
 import { pickMood } from '../core/mood.js';
 import { clampSize, SIZE_PRESETS, SIZE_DEFAULT } from '../core/placement.js';
 import { clawdIconPNG } from '../core/png.js';
-import { createClawdWindow, createPanelWindow, placePanel, resizeClawdWindow, onScreenPosition } from './windows.js';
+import { PALETTES } from '../core/sprite.js';
+import { createClawdWindow, createPanelWindow, placePanel, resizeClawdWindow, shapeClawdWindow, onScreenPosition, clawdWindowSize } from './windows.js';
 
 const appRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SHORTCUT = 'Control+Alt+Space';
@@ -22,6 +23,8 @@ let panelOpen = false;
 let lastState = { view: { open: [], done: [], total: 0, doneCount: 0 }, status: 'signed-out' };
 let justCompletedUntil = 0;
 let dragTimer = null;
+let shapedAs = '';
+let fidget = null; // random idle pose, see scheduleFidget
 let blurClosedAt = 0; // clicking Clawd or the tray blurs the panel first; don't let that click reopen it
 
 function loadConfig() {
@@ -69,9 +72,17 @@ function updateMood() {
     open: view.open.length, done: view.doneCount, hour: new Date().getHours(), panelOpen,
     offline: status !== 'synced' && status !== 'syncing',
     idleMinutes: powerMonitor.getSystemIdleTime() / 60,
-    justCompleted: Date.now() < justCompletedUntil,
+    justCompleted: Date.now() < justCompletedUntil, fidget,
   });
   send('mood', mood);
+  reshapeClawd(mood);
+}
+
+function reshapeClawd(mood) {
+  const key = `${mood}@${currentSize()}`;
+  if (key === shapedAs || !clawdWin || clawdWin.isDestroyed()) return;
+  shapedAs = key;
+  shapeClawdWindow(clawdWin, mood, currentSize());
 }
 
 // ---------- panel ----------
@@ -93,6 +104,17 @@ const togglePanel = () => {
   setPanel(!panelOpen);
 };
 
+// ---------- colour ----------
+const currentColor = () => (PALETTES[settings.get('clawdColor')] ? settings.get('clawdColor') : 'orange');
+const trayIcon = () => nativeImage.createFromBuffer(clawdIconPNG(32, 'idle', currentColor()));
+
+function setClawdColor(color) {
+  settings.set('clawdColor', color);
+  send('color', color);
+  tray?.setImage(trayIcon());
+  refreshTray();
+}
+
 // ---------- size + position ----------
 const currentSize = () => clampSize(settings.get('clawdSize') ?? SIZE_DEFAULT);
 
@@ -102,14 +124,18 @@ function setClawdSize(px) {
   const pos = resizeClawdWindow(clawdWin, size);
   settings.set('clawdPos', pos);
   send('size', size);
+  updateMood();
   if (panelOpen) placePanel(panelWin, clawdWin);
   refreshTray();
 }
 
+// Move with an explicit size: setPosition alone grows the window a few px per call at 125%/150% scaling.
+const moveClawd = (x, y) => clawdWin.setBounds({ x, y, ...clawdWindowSize(currentSize()) });
+
 function keepClawdOnScreen() {
   const { x, y } = clawdWin.getBounds();
   const pos = onScreenPosition({ x, y }, currentSize());
-  clawdWin.setPosition(pos.x, pos.y);
+  moveClawd(pos.x, pos.y);
   settings.set('clawdPos', pos);
 }
 
@@ -126,6 +152,9 @@ function refreshTray() {
       if (clawdWin.isVisible()) { setPanel(false); clawdWin.hide(); } else clawdWin.showInactive();
       refreshTray();
     } },
+    { label: 'Colour', submenu: Object.keys(PALETTES).map(c => ({
+      label: c[0].toUpperCase() + c.slice(1), type: 'radio', checked: currentColor() === c, click: () => setClawdColor(c),
+    })) },
     { label: 'Size', submenu: Object.entries(SIZE_PRESETS).map(([label, px]) => ({
       label, type: 'radio', checked: size === px, click: () => setClawdSize(px),
     })) },
@@ -171,12 +200,13 @@ function wireIPC() {
   ipcMain.on('renderer:ready', e => {
     e.sender.send('state', lastState);
     e.sender.send('size', currentSize());
+    e.sender.send('color', currentColor());
     e.sender.send('panel', panelOpen);
     updateMood();
   });
-  ipcMain.on('clawd:ignore', (_e, ignore) => clawdWin.setIgnoreMouseEvents(!!ignore, { forward: true }));
   ipcMain.on('clawd:resize-by', (_e, delta) => setClawdSize(currentSize() + Number(delta || 0)));
   ipcMain.on('clawd:click', togglePanel);
+  ipcMain.on('clawd:set-color', (_e, color) => { if (Object.hasOwn(PALETTES, color)) setClawdColor(color); });
   ipcMain.on('panel:close', () => setPanel(false));
   ipcMain.on('app:quit', () => app.quit());
 
@@ -186,7 +216,7 @@ function wireIPC() {
     clearInterval(dragTimer);
     dragTimer = setInterval(() => {
       const p = screen.getCursorScreenPoint();
-      clawdWin.setPosition(origin.x + p.x - start.x, origin.y + p.y - start.y);
+      moveClawd(origin.x + p.x - start.x, origin.y + p.y - start.y);
       if (panelOpen) placePanel(panelWin, clawdWin);
     }, 16);
   });
@@ -199,12 +229,24 @@ function wireIPC() {
 }
 
 // ---------- timers ----------
+// Every 1.5–4 min Clawd briefly does something random, so he doesn't sit frozen all day.
+const FIDGETS = ['happy', 'wave', 'look-left', 'look-right'];
+function scheduleFidget() {
+  setTimeout(() => {
+    fidget = FIDGETS[Math.floor(Math.random() * FIDGETS.length)];
+    updateMood();
+    setTimeout(() => { fidget = null; updateMood(); }, 6000);
+    scheduleFidget();
+  }, (90 + Math.random() * 150) * 1000);
+}
+
 function scheduleMidnight() {
   const now = new Date();
   const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 5);
   setTimeout(() => {
     if (sync) sync.emitState(); // view is rebuilt with the new "today"
     scheduleMidnight();
+  scheduleFidget();
   }, next - now);
 }
 
@@ -222,7 +264,7 @@ app.whenReady().then(async () => {
   panelWin.on('close', e => { if (!app.isQuitting) { e.preventDefault(); setPanel(false); } });
   panelWin.on('blur', () => { if (panelOpen) { blurClosedAt = Date.now(); setPanel(false); } });
 
-  tray = new Tray(nativeImage.createFromBuffer(clawdIconPNG(32)));
+  tray = new Tray(trayIcon());
   tray.on('click', togglePanel);
 
   wireIPC();

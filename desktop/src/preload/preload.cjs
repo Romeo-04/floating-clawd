@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('clawd', {
   onState: on('state'),
   onMood: on('mood'),
   onSize: on('size'),
+  onColor: on('color'),
   onPanel: on('panel'),
   ready: () => ipcRenderer.send('renderer:ready'),
 
@@ -22,11 +23,11 @@ contextBridge.exposeInMainWorld('clawd', {
   signIn: (email, password) => ipcRenderer.invoke('auth:sign-in', email, password),
   signOut: () => ipcRenderer.invoke('auth:sign-out'),
 
-  setIgnoreMouse: ignore => ipcRenderer.send('clawd:ignore', ignore),
   resizeBy: delta => ipcRenderer.send('clawd:resize-by', delta),
   dragStart: () => ipcRenderer.send('clawd:drag-start'),
   dragEnd: () => ipcRenderer.send('clawd:drag-end'),
   clawdClick: () => ipcRenderer.send('clawd:click'),
+  setColor: color => ipcRenderer.send('clawd:set-color', color),
   closePanel: () => ipcRenderer.send('panel:close'),
   quit: () => ipcRenderer.send('app:quit'),
 });

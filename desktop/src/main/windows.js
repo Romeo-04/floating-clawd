@@ -2,7 +2,7 @@
 import { BrowserWindow, screen } from 'electron';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
-import { spriteHeight } from '../core/sprite.js';
+import { spriteHeight, spriteRects } from '../core/sprite.js';
 import { clampToWorkArea, panelPlacement } from '../core/placement.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -11,6 +11,7 @@ const page = name => join(here, '..', 'renderer', name, 'index.html');
 
 export const PANEL_SIZE = { width: 340, height: 560 };
 const PAD_X = 8, PAD_TOP = 18, PAD_BOTTOM = 8; // room for the hop and drop shadow
+const LIFT = 11; // bob (3px) + hop (8px) in clawd.css
 
 export const clawdWindowSize = size => ({ width: size + PAD_X * 2, height: spriteHeight(size) + PAD_TOP + PAD_BOTTOM });
 
@@ -47,11 +48,22 @@ export function createClawdWindow({ size, pos }) {
   });
   win.setAlwaysOnTop(true, 'screen-saver');
   win.setVisibleOnAllWorkspaces(true);
-  win.setIgnoreMouseEvents(true, { forward: true });
   lockDown(win);
   win.loadFile(page('clawd'));
   win.once('ready-to-show', () => win.showInactive());
   return win;
+}
+
+// Only Clawd's own pixels (with room to bob and hop, plus his shadow) belong to the window,
+// so Windows sends clicks anywhere else straight to whatever is underneath. This replaces
+// setIgnoreMouseEvents({ forward: true }), whose system-wide mouse hook froze the laptop.
+export function shapeClawdWindow(win, mood, size) {
+  const rects = spriteRects(mood, size).map(r => ({
+    x: r.x + PAD_X, y: r.y + PAD_TOP - LIFT, width: r.width, height: r.height + LIFT,
+  }));
+  const inset = Math.round(size * 0.12);
+  rects.push({ x: PAD_X + inset - 2, y: PAD_TOP + spriteHeight(size) - 3, width: size - 2 * inset + 4, height: PAD_BOTTOM + 3 });
+  win.setShape(rects);
 }
 
 export function resizeClawdWindow(win, size) {

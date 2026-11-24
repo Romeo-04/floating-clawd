@@ -7,6 +7,13 @@ export const COLORS = {
   y: '#F7C96B', Y: '#F29E6B', b: '#8EC5E8',
 };
 
+// Body colours (o body, s shade, h highlight); everything else comes from COLORS.
+export const PALETTES = {
+  orange: { o: '#D97757', s: '#B85C3E', h: '#E58A68' },
+  pink: { o: '#E98BB0', s: '#C8668F', h: '#F4AECA' },
+};
+export const colorsFor = color => ({ ...COLORS, ...(PALETTES[color] ?? PALETTES.orange) });
+
 // Grid cells span x -3..18 and y -4..9.
 export const SPRITE_BOX = { minX: -3, minY: -4, w: 22, h: 14 };
 
@@ -20,22 +27,20 @@ export function clawdPixels(mood, { blink = false } = {}) {
   for (let x = 2; x < 14; x++) put(x, 7, 's');
   for (const x of [3, 5, 10, 12]) { put(x, 8, 'o'); put(x, 9, 's'); }
 
-  if (mood === 'celebrate') {
-    for (const y of [1, 2, 3]) { put(0, y, 'o'); put(1, y, 'o'); put(14, y, 'o'); put(15, y, 's'); }
-    put(0, 0, 'o'); put(15, 0, 's');
-  } else {
-    put(0, 4, 'o'); put(1, 4, 'o'); put(0, 5, 's'); put(1, 5, 's');
-    put(14, 4, 'o'); put(15, 4, 's'); put(14, 5, 's'); put(15, 5, 's');
-  }
+  const leftUp = mood === 'celebrate', rightUp = mood === 'celebrate' || mood === 'wave';
+  if (leftUp) { for (const y of [1, 2, 3]) { put(0, y, 'o'); put(1, y, 'o'); } put(0, 0, 'o'); }
+  else { put(0, 4, 'o'); put(1, 4, 'o'); put(0, 5, 's'); put(1, 5, 's'); }
+  if (rightUp) { for (const y of [1, 2, 3]) { put(14, y, 'o'); put(15, y, 's'); } put(15, 0, 's'); }
+  else { put(14, 4, 'o'); put(15, 4, 's'); put(14, 5, 's'); put(15, 5, 's'); }
 
-  const eyes = [4, 11];
+  const eyes = mood === 'look-left' ? [3, 10] : mood === 'look-right' ? [5, 12] : [4, 11];
   const vert = (dy = 0) => eyes.forEach(x => { put(x, 2 + dy, 'e'); put(x, 3 + dy, 'e'); });
   const line = (y = 3) => eyes.forEach(x => { put(x - 1, y, 'e'); put(x, y, 'e'); put(x + 1, y, 'e'); });
   const caret = () => eyes.forEach(x => { put(x, 2, 'e'); put(x - 1, 3, 'e'); put(x + 1, 3, 'e'); });
 
   switch (mood) {
     case 'blink': line(3); break;
-    case 'happy': caret(); break;
+    case 'happy': case 'wave': caret(); break;
     case 'celebrate':
       caret();
       for (const [cx, cy, k] of [[-1, -2, 'y'], [17, -2, 'Y']]) {
@@ -72,14 +77,39 @@ export function clawdPixels(mood, { blink = false } = {}) {
 
 export const spriteHeight = widthPx => Math.round((widthPx * SPRITE_BOX.h) / SPRITE_BOX.w);
 
-export function spriteSVG(mood, widthPx, opts) {
+export function spriteSVG(mood, widthPx, opts = {}) {
+  const colors = colorsFor(opts.color);
   let rects = '';
   for (const [key, col] of clawdPixels(mood, opts)) {
     const [x, y] = key.split(',');
-    rects += `<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="${COLORS[col]}"/>`;
+    rects += `<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="${colors[col]}"/>`;
   }
   const { minX, minY, w, h } = SPRITE_BOX;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${minX} ${minY} ${w} ${h}" width="${widthPx}" height="${spriteHeight(widthPx)}" shape-rendering="crispEdges">${rects}</svg>`;
+}
+
+// The drawn pixels as whole-pixel rects (sprite-relative), one per horizontal run of each row.
+// Used as the window's shape so Windows itself lets clicks through the transparent parts.
+export function spriteRects(mood, widthPx) {
+  const cell = widthPx / SPRITE_BOX.w;
+  const rows = new Map();
+  for (const key of clawdPixels(mood).keys()) {
+    const [x, y] = key.split(',').map(Number);
+    if (!rows.has(y)) rows.set(y, []);
+    rows.get(y).push(x);
+  }
+  const rects = [];
+  for (const [y, xs] of rows) {
+    xs.sort((a, b) => a - b);
+    const top = Math.floor((y - SPRITE_BOX.minY) * cell), bottom = Math.ceil((y + 1 - SPRITE_BOX.minY) * cell);
+    for (let i = 0; i < xs.length; i++) {
+      const start = xs[i];
+      while (xs[i + 1] === xs[i] + 1) i++;
+      const left = Math.floor((start - SPRITE_BOX.minX) * cell), right = Math.ceil((xs[i] + 1 - SPRITE_BOX.minX) * cell);
+      rects.push({ x: left, y: top, width: right - left, height: bottom - top });
+    }
+  }
+  return rects;
 }
 
 // Is the point (in rendered pixels, relative to the sprite's top-left) on a drawn pixel?
