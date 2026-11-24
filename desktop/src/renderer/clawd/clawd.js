@@ -1,5 +1,5 @@
-// Floating Clawd: draws the sprite, animates moods, and hit-tests the pointer pixel by pixel
-// so clicks on transparent areas fall through to whatever is underneath.
+// Floating Clawd: draws the sprite, animates moods, and handles drag, click and Ctrl+wheel.
+// Click-through on transparent areas is done by the window's shape (see shapeClawdWindow).
 import { spriteSVG, isOpaque } from '../../core/sprite.js';
 
 const api = window.clawd;
@@ -9,16 +9,16 @@ const sprite = document.getElementById('sprite');
 
 const RESIZE_STEP = 8;
 const CLICK_SLOP = 4;
-const BLINK_MOODS = new Set(['idle', 'typing']);
+const BLINK_MOODS = new Set(['idle', 'typing', 'look-left', 'look-right']);
 
 let mood = 'idle';
 let size = 104;
+let color = 'orange';
 let blinking = false;
-let ignoring = true;
 let drag = null; // { x, y, moved }
 
 function render() {
-  sprite.innerHTML = spriteSVG(mood, size, { blink: blinking });
+  sprite.innerHTML = spriteSVG(mood, size, { blink: blinking, color });
   sprite.className = mood;
 }
 
@@ -54,12 +54,6 @@ function overClawd(e) {
   return isOpaque(mood, e.clientX - r.left, e.clientY - r.top, size);
 }
 
-function setIgnore(ignore) {
-  if (ignore === ignoring) return;
-  ignoring = ignore;
-  api.setIgnoreMouse(ignore);
-}
-
 function endDrag(e) {
   if (!drag) return;
   const moved = drag.moved || Math.hypot(e.screenX - drag.x, e.screenY - drag.y) >= CLICK_SLOP;
@@ -67,19 +61,13 @@ function endDrag(e) {
   stage.classList.remove('dragging');
   api.dragEnd();
   if (!moved) api.clawdClick();
-  setIgnore(!overClawd(e));
 }
 
 window.addEventListener('mousemove', e => {
-  if (drag) {
-    if (e.buttons === 0) return endDrag(e); // mouseup was lost outside the window
-    if (Math.hypot(e.screenX - drag.x, e.screenY - drag.y) >= CLICK_SLOP) drag.moved = true;
-    return;
-  }
-  setIgnore(!overClawd(e));
+  if (!drag) return;
+  if (e.buttons === 0) return endDrag(e); // mouseup was lost outside the window
+  if (Math.hypot(e.screenX - drag.x, e.screenY - drag.y) >= CLICK_SLOP) drag.moved = true;
 });
-
-window.addEventListener('mouseleave', () => { if (!drag) setIgnore(true); });
 
 window.addEventListener('mousedown', e => {
   if (e.button !== 0 || !overClawd(e)) return;
@@ -99,6 +87,7 @@ window.addEventListener('wheel', e => {
 // ---- state from main ----
 api.onMood(setMood);
 api.onSize(px => { size = px; render(); });
+api.onColor(c => { color = c; render(); });
 
 render();
 scheduleBlink();

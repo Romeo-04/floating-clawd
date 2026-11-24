@@ -1,6 +1,6 @@
 // Tiny PNG/ICO writer for Clawd icons (no image libraries needed).
 import { deflateSync, crc32 } from 'node:zlib';
-import { clawdPixels, COLORS } from './sprite.js';
+import { clawdPixels, colorsFor } from './sprite.js';
 
 const hexToRGBA = hex => {
   const m = hex.match(/^#([0-9a-f]{6})$/i);
@@ -32,7 +32,8 @@ export function encodePNG(width, height, rgba) {
 }
 
 // Square icon of Clawd's body (grid x 0..15, y 0..9), centred.
-export function clawdIconPNG(size, mood = 'idle') {
+export function clawdIconPNG(size, mood = 'idle', color = 'orange') {
+  const colors = colorsFor(color);
   const scale = Math.floor(size / 16);
   const rgba = Buffer.alloc(size * size * 4);
   const offX = Math.floor((size - 16 * scale) / 2);
@@ -40,7 +41,7 @@ export function clawdIconPNG(size, mood = 'idle') {
   for (const [key, col] of clawdPixels(mood)) {
     const [gx, gy] = key.split(',').map(Number);
     if (gx < 0 || gx > 15 || gy < 0 || gy > 9) continue;
-    const [r, g, b, a] = hexToRGBA(COLORS[col]);
+    const [r, g, b, a] = hexToRGBA(colors[col]);
     for (let dy = 0; dy < scale; dy++) for (let dx = 0; dx < scale; dx++) {
       const x = offX + gx * scale + dx, y = offY + gy * scale + dy;
       const i = (y * size + x) * 4;

@@ -91,6 +91,13 @@ kbd { margin-left: auto; font: 500 10px/1 var(--ui); color: var(--cream-3); bord
 .p-foot { display: flex; align-items: center; gap: 6px; padding: 8px 6px 0; border-top: 1px solid var(--cream-line); font-size: 11px; color: var(--cream-3); flex: none; }
 .power { flex: none; display: grid; place-items: center; width: 24px; height: 24px; margin: -4px -4px -4px 0; border-radius: 6px; color: var(--cream-3); transition: color .18s ease-out, background-color .18s ease-out; }
 .power:hover { color: var(--clawd-hi); background: rgba(245,239,230,.07); }
+.swatches { flex: none; display: flex; margin: -4px 0; }
+.swatch { display: grid; place-items: center; width: 22px; height: 24px; border-radius: 6px; }
+.swatch::after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--sw); transition: box-shadow .18s ease-out, transform .18s ease-out; }
+.swatch:hover::after { transform: scale(1.15); }
+.swatch[aria-pressed="true"]::after { box-shadow: 0 0 0 2px rgba(28,22,19,.9), 0 0 0 3.5px var(--cream-2); }
+.sw-orange { --sw: #D97757; }
+.sw-pink { --sw: #E98BB0; }
 .power:active { background: rgba(245,239,230,.12); }
 .dot { width: 6px; height: 6px; border-radius: 1px; background: #7fd19b; flex: none; }
 .dot.syncing { background: #F7C96B; }
