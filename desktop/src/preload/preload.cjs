@@ -28,4 +28,5 @@ contextBridge.exposeInMainWorld('clawd', {
   dragEnd: () => ipcRenderer.send('clawd:drag-end'),
   clawdClick: () => ipcRenderer.send('clawd:click'),
   closePanel: () => ipcRenderer.send('panel:close'),
+  quit: () => ipcRenderer.send('app:quit'),
 });

@@ -17,7 +17,8 @@ A pixel Clawd that floats on your Windows desktop. Tap him and a glass to-do lis
   - He gets sleepy late at night, and shows a little raindrop when he's offline.
 - **Resize him:** hold `Ctrl` and scroll over Clawd, or right-click the tray icon and pick **Size**. Sizes run from Small to Extra large; he stays anchored to his bottom-right corner.
 - **Works offline.** Changes are saved locally and sync when you're back online. If the laptop and phone edit the same task, the latest edit wins.
-- **Tray menu:** open the list, show or hide Clawd, size, Start with Windows, sign out, quit.
+- **Turn him off** with the power button in the panel footer (or **Turn off** in the tray menu). Open **Floating Clawd** from the desktop icon to bring him back.
+- **Tray menu:** open the list, show or hide Clawd, size, Start with Windows, sign out, turn off.
 
 The Android widget lives in a separate plan and is not built yet.
 
@@ -46,7 +47,7 @@ npm run dist      # → desktop/dist/Floating Clawd Setup <version>.exe
 
 If `desktop/config.local.json` exists, it is bundled into the installer, so the installed app is ready to sign in. You can also drop a `config.local.json` into `%APPDATA%\floating-clawd\` after installing.
 
-The installed app starts with Windows by default. Turn that off from the tray menu.
+The installer adds a **Floating Clawd** shortcut, with Clawd as its icon, to the desktop and the Start menu. The installed app starts with Windows by default. Turn that off from the tray menu.
 
 `npm run icon` regenerates `desktop/assets/icon.ico` from the sprite.
 

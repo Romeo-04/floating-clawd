@@ -9,6 +9,7 @@ const ICONS = {
   plus: '<path d="M12 5v14M5 12h14"/>',
   check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   trash: '<path d="M4 7h16M10 7V4h4v3M6 7l1 13h10l1-13"/>',
+  power: '<path d="M12 3v8"/><path d="M6.4 7.2a7.5 7.5 0 1 0 11.2 0"/>',
   grip: '<g fill="currentColor" stroke="none"><circle cx="9" cy="6" r="1.3"/><circle cx="15" cy="6" r="1.3"/><circle cx="9" cy="12" r="1.3"/><circle cx="15" cy="12" r="1.3"/><circle cx="9" cy="18" r="1.3"/><circle cx="15" cy="18" r="1.3"/></g>',
 };
 const icon = (name, size, stroke = 2.2) =>
@@ -25,6 +26,7 @@ let dragId = null;
 let errorTimer = null;
 
 document.querySelectorAll('[data-icon]').forEach(el => { el.innerHTML = icon(el.dataset.icon, 16); });
+$('power').addEventListener('click', () => api.quit());
 $('empty-clawd').innerHTML = spriteSVG('idle', 56);
 $('auth-clawd').innerHTML = spriteSVG('sleepy', 88);
 

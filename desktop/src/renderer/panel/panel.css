@@ -89,6 +89,9 @@ kbd { margin-left: auto; font: 500 10px/1 var(--ui); color: var(--cream-3); bord
 
 /* ---------- footer ---------- */
 .p-foot { display: flex; align-items: center; gap: 6px; padding: 8px 6px 0; border-top: 1px solid var(--cream-line); font-size: 11px; color: var(--cream-3); flex: none; }
+.power { flex: none; display: grid; place-items: center; width: 24px; height: 24px; margin: -4px -4px -4px 0; border-radius: 6px; color: var(--cream-3); transition: color .18s ease-out, background-color .18s ease-out; }
+.power:hover { color: var(--clawd-hi); background: rgba(245,239,230,.07); }
+.power:active { background: rgba(245,239,230,.12); }
 .dot { width: 6px; height: 6px; border-radius: 1px; background: #7fd19b; flex: none; }
 .dot.syncing { background: #F7C96B; }
 .dot.offline { background: var(--cream-3); }

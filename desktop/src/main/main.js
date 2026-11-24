@@ -134,7 +134,7 @@ function refreshTray() {
       click: item => { app.setLoginItemSettings({ openAtLogin: item.checked }); settings.set('autostart', item.checked); } },
     { label: 'Sign out', enabled: signedIn && !!sync, click: () => signOut() },
     { type: 'separator' },
-    { label: 'Quit', click: () => app.quit() },
+    { label: 'Turn off', click: () => app.quit() },
   ]));
 }
 
@@ -178,6 +178,7 @@ function wireIPC() {
   ipcMain.on('clawd:resize-by', (_e, delta) => setClawdSize(currentSize() + Number(delta || 0)));
   ipcMain.on('clawd:click', togglePanel);
   ipcMain.on('panel:close', () => setPanel(false));
+  ipcMain.on('app:quit', () => app.quit());
 
   ipcMain.on('clawd:drag-start', () => {
     const start = screen.getCursorScreenPoint();
