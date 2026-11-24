@@ -61,7 +61,7 @@ function renderSeg({ total, doneCount }) {
   if (total > SEGMENT_CAP) {
     seg.className = 'seg continuous';
     const fill = document.createElement('i');
-    fill.style.width = `${(doneCount / total) * 100}%`;
+    fill.style.transform = `scaleX(${doneCount / total})`;
     seg.replaceChildren(fill);
   } else {
     seg.className = 'seg';

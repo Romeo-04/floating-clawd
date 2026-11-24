@@ -28,7 +28,7 @@ button { background: none; border: 0; cursor: pointer; }
 .seg i { height: 5px; border-radius: 1px; background: var(--cream-line); }
 .seg i.on { background: var(--clawd); }
 .seg.continuous { display: block; height: 5px; border-radius: 1px; background: var(--cream-line); margin-inline: 4px; padding: 0; overflow: hidden; }
-.seg.continuous i { display: block; height: 100%; background: var(--clawd); border-radius: 0; transition: width .18s ease-out; }
+.seg.continuous i { display: block; width: 100%; height: 100%; background: var(--clawd); border-radius: 0; transform: scaleX(0); transform-origin: left; transition: transform .18s ease-out; }
 .all-done { margin: -8px 4px 0; font: 400 9px/1 var(--px); letter-spacing: .06em; color: var(--clawd-hi); }
 
 /* ---------- add ---------- */
