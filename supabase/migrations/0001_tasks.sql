@@ -17,6 +17,10 @@ create index if not exists tasks_user_date_idx on public.tasks (user_id, for_dat
 
 alter table public.tasks enable row level security;
 
+-- Newer projects don't expose new tables to the API automatically; grant only what the app uses.
+revoke all on public.tasks from anon;
+grant select, insert, update on public.tasks to authenticated;
+
 create policy "tasks: read own"   on public.tasks for select to authenticated
   using (user_id = (select auth.uid()));
 create policy "tasks: insert own" on public.tasks for insert to authenticated
