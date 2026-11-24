@@ -29,5 +29,9 @@ export function createSettings({ dir, crypto }) {
       else return; // never store a session in plain text
       save();
     },
+    clearSecrets(prefix) {
+      for (const key of Object.keys(data.secrets)) if (key.startsWith(prefix)) delete data.secrets[key];
+      save();
+    },
   };
 }

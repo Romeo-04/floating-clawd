@@ -15,26 +15,36 @@ function memorySettings() {
   };
 }
 
-function fakeClient({ session = { user: { email: 'me@example.com' } } } = {}) {
+function fakeClient({ session = { user: { email: 'me@example.com' } }, sessionError = null } = {}) {
   let authCb = null;
   const client = {
-    upserts: [], failUpserts: false, remoteRows: [],
+    upserts: [], failUpserts: false, failSelect: false, remoteRows: [], holdUpsert: null, filters: [],
+    signOutCalls: [], signOutError: null,
     auth: {
-      getSession: async () => ({ data: { session } }),
+      getSession: async () => ({ data: { session }, error: sessionError }),
       onAuthStateChange: cb => { authCb = cb; return { data: { subscription: { unsubscribe() {} } } }; },
       signInWithPassword: async ({ email, password }) => password === 'right'
         ? { data: { session: { user: { email } } }, error: null }
         : { data: { session: null }, error: { message: 'Invalid login credentials' } },
-      signOut: async () => { authCb?.('SIGNED_OUT', null); return { error: null }; },
+      signOut: async opts => {
+        client.signOutCalls.push(opts);
+        if (client.signOutError) return { error: client.signOutError };
+        authCb?.('SIGNED_OUT', null);
+        return { error: null };
+      },
     },
     emitAuth: (event, s) => authCb(event, s),
     from: () => ({
       upsert: async rows => {
+        if (client.holdUpsert) await client.holdUpsert;
         if (client.failUpserts) return { error: { message: 'TypeError: fetch failed' } };
         client.upserts.push(rows);
         return { error: null };
       },
-      select: () => ({ or: async () => ({ data: client.remoteRows, error: null }) }),
+      select: () => ({ or: async f => {
+        client.filters.push(f);
+        return client.failSelect ? { data: null, error: { message: 'fetch failed' } } : { data: client.remoteRows, error: null };
+      } }),
     }),
     channel: () => ({ on() { return this; }, subscribe() { return this; } }),
     removeChannel() {},
@@ -44,8 +54,8 @@ function fakeClient({ session = { user: { email: 'me@example.com' } } } = {}) {
 
 const noTimers = { setTimeout: () => 0, clearTimeout: () => {} };
 
-async function started(client = fakeClient(), settings = memorySettings()) {
-  const sync = new TaskSync({ client, settings, now: () => NOW, timers: noTimers });
+async function started(client = fakeClient(), settings = memorySettings(), extra = {}) {
+  const sync = new TaskSync({ client, settings, now: () => NOW, timers: noTimers, ...extra });
   const states = [];
   sync.on('state', s => states.push(s));
   await sync.start();
@@ -147,6 +157,79 @@ describe('TaskSync', () => {
   });
 });
 
+describe('TaskSync review fixes', () => {
+  it('sends an edit made while another upload is in flight', async () => {
+    const { sync, client, settings, last } = await started();
+    let release;
+    client.holdUpsert = new Promise(r => { release = r; });
+    const first = sync.add('First');
+    const second = sync.add('Second');
+    client.holdUpsert = null;
+    release();
+    await Promise.all([first, second]);
+    expect(client.upserts.flat().map(r => r.title)).toEqual(['First', 'Second']);
+    expect(Object.keys(settings.get('cache').pending)).toHaveLength(0);
+    expect(last().status).toBe('synced');
+  });
+
+  it('stays offline when the refresh fails and nothing is queued', async () => {
+    const client = fakeClient();
+    client.failSelect = true;
+    const { states, last } = await started(client);
+    expect(last().status).toBe('offline');
+    expect(states.map(s => s.status)).not.toContain('synced');
+    expect(last().lastSyncedAt).toBeNull();
+  });
+
+  it('keeps the cached list offline when the session cannot refresh at boot, then reconnects', async () => {
+    const settings = memorySettings();
+    settings.set('cache', { rows: { a: { id: 'a', title: 'Cached', done: false, done_at: null, for_date: '2026-11-24',
+      position: 1, created_at: '2026-11-24T01:00:00Z', updated_at: '2026-11-24T01:00:00Z', deleted: false } }, pending: {} });
+    const client = fakeClient({ session: null, sessionError: { name: 'AuthRetryableFetchError', message: 'fetch failed', status: 0 } });
+    const { last } = await started(client, settings);
+    expect(last().status).toBe('offline');
+    expect(last().view.open.map(t => t.title)).toEqual(['Cached']);
+    client.emitAuth('TOKEN_REFRESHED', { user: { email: 'me@example.com' } });
+    await new Promise(r => setTimeout(r, 0));
+    expect(last().status).toBe('synced');
+  });
+
+  it('ignores a null INITIAL_SESSION event instead of signing out', async () => {
+    const { client, last } = await started();
+    client.emitAuth('INITIAL_SESSION', null);
+    expect(last().status).toBe('synced');
+  });
+
+  it('signs out of this device only, and forgets the session even when offline', async () => {
+    let cleared = 0;
+    const client = fakeClient();
+    const { sync, last } = await started(client, memorySettings(), { clearSession: () => { cleared++; } });
+    client.signOutError = { name: 'AuthRetryableFetchError', message: 'fetch failed', status: 0 };
+    await sync.signOut();
+    expect(client.signOutCalls.at(-1)).toEqual({ scope: 'local' });
+    expect(cleared).toBe(1);
+    expect(last().status).toBe('signed-out');
+  });
+
+  it('counts unsent edits so sign-out can warn', async () => {
+    const { sync, client } = await started();
+    client.failUpserts = true;
+    await sync.add('Unsent');
+    expect(sync.pendingCount()).toBe(1);
+  });
+
+  it('refresh also fetches recently changed old tasks', async () => {
+    const { client } = await started();
+    expect(client.filters.at(-1)).toMatch(/updated_at\.gte\.2026-11-10T/);
+  });
+
+  it('treats unknown ids (including __proto__) as not found', async () => {
+    const { sync } = await started();
+    expect(await sync.toggle('__proto__')).toEqual({ ok: false, error: 'Task not found' });
+    expect(await sync.remove('constructor')).toEqual({ ok: false, error: 'Task not found' });
+  });
+});
+
 describe('createSettings', () => {
   const fakeCrypto = {
     isEncryptionAvailable: () => true,
@@ -163,6 +246,15 @@ describe('createSettings', () => {
     expect(b.get('clawdSize')).toBe(144);
     expect(b.getSecret('sb-session')).toBe('TOPSECRET');
     expect(readFileSync(join(dir, 'settings.json'), 'utf8')).not.toContain('TOPSECRET');
+  });
+
+  it('clears secrets by prefix', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'clawd-'));
+    const a = createSettings({ dir, crypto: fakeCrypto });
+    a.setSecret('sb:token', 'x'); a.setSecret('other', 'y');
+    a.clearSecrets('sb:');
+    expect(a.getSecret('sb:token')).toBeNull();
+    expect(a.getSecret('other')).toBe('y');
   });
 
   it('starts empty when the file is corrupt', async () => {

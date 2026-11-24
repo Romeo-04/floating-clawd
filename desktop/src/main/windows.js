@@ -32,6 +32,12 @@ const common = {
   webPreferences: { preload, contextIsolation: true, sandbox: true, nodeIntegration: false, backgroundThrottling: false },
 };
 
+// Both windows only ever show local pages: block navigation and new windows.
+function lockDown(win) {
+  win.webContents.on('will-navigate', e => e.preventDefault());
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+}
+
 export function createClawdWindow({ size, pos }) {
   const { width, height } = clawdWindowSize(size);
   const { x, y } = onScreenPosition(pos, size);
@@ -42,6 +48,7 @@ export function createClawdWindow({ size, pos }) {
   win.setAlwaysOnTop(true, 'screen-saver');
   win.setVisibleOnAllWorkspaces(true);
   win.setIgnoreMouseEvents(true, { forward: true });
+  lockDown(win);
   win.loadFile(page('clawd'));
   win.once('ready-to-show', () => win.showInactive());
   return win;
@@ -62,6 +69,7 @@ export function createPanelWindow() {
     backgroundColor: '#00000000', backgroundMaterial: 'acrylic', roundedCorners: true,
   });
   win.setAlwaysOnTop(true, 'floating');
+  lockDown(win);
   win.loadFile(page('panel'));
   return win;
 }

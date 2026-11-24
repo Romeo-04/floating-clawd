@@ -1,7 +1,12 @@
 // Local cache + offline queue. Last write wins on updated_at (compared as instants).
 // State: { rows: { [id]: Task }, pending: { [id]: Task } }  — pending = not yet confirmed by the server.
 
-const t = iso => Date.parse(iso);
+// Postgres/Realtime may send "2026-11-24 09:00:00.123456+00"; normalise to ISO before parsing.
+const t = iso => {
+  const ms = Date.parse(iso);
+  if (!Number.isNaN(ms) || typeof iso !== 'string') return ms;
+  return Date.parse(iso.replace(' ', 'T').replace(/([+-]\d\d)$/, '$1:00'));
+};
 
 export const emptyState = () => ({ rows: {}, pending: {} });
 

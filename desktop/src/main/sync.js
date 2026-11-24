@@ -7,11 +7,13 @@ import { emptyState, applyLocal, mergeRemote, pendingRows, ackPending } from '..
 const COLUMNS = ['id', 'title', 'done', 'done_at', 'for_date', 'position', 'created_at', 'updated_at', 'deleted'];
 const pick = r => Object.fromEntries(COLUMNS.map(k => [k, r[k] ?? null]));
 const HISTORY_DAYS = 14;
+// auth-js reports network failures as AuthRetryableFetchError (status 0 or 5xx).
+const isRetryable = e => !!e && (e.name === 'AuthRetryableFetchError' || e.status === 0 || e.status >= 500);
 
 export class TaskSync extends EventEmitter {
-  constructor({ client, settings, now = () => new Date(), timers = globalThis, retry = { min: 2000, max: 60000 } }) {
+  constructor({ client, settings, now = () => new Date(), timers = globalThis, retry = { min: 2000, max: 60000 }, clearSession = () => {} }) {
     super();
-    Object.assign(this, { client, settings, now, timers, retry });
+    Object.assign(this, { client, settings, now, timers, retry, clearSession });
     this.state = settings.get('cache') ?? emptyState();
     this.status = 'signed-out';
     this.session = null;
@@ -38,20 +40,34 @@ export class TaskSync extends EventEmitter {
   setStatus(s) { this.status = s; this.emitState(); }
   persist() { this.settings.set('cache', this.state); }
 
+  row(id) { return typeof id === 'string' && Object.hasOwn(this.state.rows, id) ? this.state.rows[id] : null; }
+  pendingCount() { return pendingRows(this.state).length; }
+
   async start() {
     this.client.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT' || !session) {
+      if (event === 'SIGNED_OUT') {
         this.session = null;
         this.unsubscribe();
         this.setStatus('signed-out');
-      } else {
+      } else if (session) {
+        const wasOut = !this.session;
         this.session = session;
+        // e.g. the token refreshed once the network came back after an offline boot
+        if (wasOut && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) this.connect();
       }
     });
-    const { data } = await this.client.auth.getSession();
+    await this.restoreSession();
+  }
+
+  async restoreSession() {
+    const { data, error } = await this.client.auth.getSession();
     if (data?.session) {
       this.session = data.session;
       await this.connect();
+    } else if (isRetryable(error)) {
+      // Saved session exists but couldn't be refreshed (no network): show the cached list offline.
+      this.setStatus('offline');
+      this.scheduleRetry(() => { if (!this.session) this.restoreSession(); });
     } else {
       this.setStatus('signed-out');
     }
@@ -60,8 +76,7 @@ export class TaskSync extends EventEmitter {
   async connect() {
     this.setStatus('syncing');
     this.subscribe();
-    await this.refresh();
-    await this.flush();
+    if (await this.refresh()) await this.flush();
   }
 
   subscribe() {
@@ -75,7 +90,7 @@ export class TaskSync extends EventEmitter {
         this.emitState();
       })
       .subscribe(status => {
-        if (status === 'SUBSCRIBED') { this.refresh().then(() => this.flush()); }
+        if (status === 'SUBSCRIBED') { this.refresh().then(ok => ok && this.flush()); }
         else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') { this.goOffline(); }
       });
   }
@@ -87,13 +102,17 @@ export class TaskSync extends EventEmitter {
   async signIn(email, password) {
     const { data, error } = await this.client.auth.signInWithPassword({ email, password });
     if (error) return { ok: false, error: error.message };
-    this.session = data.session;
-    await this.connect();
+    if (!this.session) { // the SIGNED_IN event may already have connected
+      this.session = data.session;
+      await this.connect();
+    }
     return { ok: true };
   }
 
+  // Signs out this laptop only (the phone stays signed in). Works offline too.
   async signOut() {
-    await this.client.auth.signOut();
+    const { error } = await this.client.auth.signOut({ scope: 'local' });
+    if (error) this.clearSession(); // auth-js keeps the local session when the server can't be reached
     this.unsubscribe();
     this.session = null;
     this.state = emptyState();
@@ -101,28 +120,37 @@ export class TaskSync extends EventEmitter {
     this.setStatus('signed-out');
   }
 
+  // Returns true when the server answered. Fetches: everything open, the last two weeks,
+  // and anything changed in the last two weeks (e.g. an old rollover ticked on the phone).
   async refresh() {
-    if (!this.session) return;
-    const since = localDateISO(new Date(this.now().getTime() - HISTORY_DAYS * 86400000));
-    const { data, error } = await this.client.from('tasks').select('*').or(`done.eq.false,for_date.gte.${since}`);
-    if (error) { this.goOffline(); return; }
+    if (!this.session) return false;
+    const sinceMs = this.now().getTime() - HISTORY_DAYS * 86400000;
+    const since = localDateISO(new Date(sinceMs));
+    const sinceTs = new Date(sinceMs).toISOString();
+    const { data, error } = await this.client.from('tasks').select('*')
+      .or(`done.eq.false,for_date.gte.${since},updated_at.gte.${sinceTs}`);
+    if (error) { this.goOffline(); return false; }
     for (const row of data ?? []) this.state = mergeRemote(this.state, pick(row));
     this.persist();
     this.emitState();
+    return true;
   }
 
   async flush() {
     if (!this.session) return;
     if (this.flushing) return this.flushing;
     this.flushing = (async () => {
-      const rows = pendingRows(this.state);
-      if (rows.length) {
+      // Loop: edits made while an upload is in flight are sent right after it.
+      let sent = false;
+      for (let rows = pendingRows(this.state); rows.length; rows = pendingRows(this.state)) {
         if (this.status !== 'syncing') this.setStatus('syncing');
         const { error } = await this.client.from('tasks').upsert(rows, { onConflict: 'id' });
         if (error) { this.goOffline(); return; }
         this.state = ackPending(this.state, rows);
         this.persist();
+        sent = true;
       }
+      if (!sent && this.status === 'offline') return; // nothing proved we're back online
       this.backoff = this.retry.min;
       this.lastSyncedAt = this.nowISO();
       this.setStatus('synced');
@@ -130,23 +158,24 @@ export class TaskSync extends EventEmitter {
     return this.flushing;
   }
 
+  scheduleRetry(fn) {
+    if (this.retryTimer) return;
+    this.retryTimer = this.timers.setTimeout(() => { this.retryTimer = null; fn(); }, this.backoff);
+    this.backoff = Math.min(this.backoff * 2, this.retry.max);
+  }
+
   goOffline() {
     if (!this.session) return;
     this.setStatus('offline');
-    if (this.retryTimer) return;
-    this.retryTimer = this.timers.setTimeout(() => {
-      this.retryTimer = null;
-      this.refresh().then(() => this.flush());
-    }, this.backoff);
-    this.backoff = Math.min(this.backoff * 2, this.retry.max);
+    this.scheduleRetry(() => this.refresh().then(ok => ok && this.flush()));
   }
 
   // Called by the app when the laptop wakes up or the network comes back.
   async wake() {
     if (this.retryTimer) { this.timers.clearTimeout(this.retryTimer); this.retryTimer = null; }
     this.backoff = this.retry.min;
-    await this.refresh();
-    await this.flush();
+    if (!this.session) { if (this.status === 'offline') await this.restoreSession(); return; }
+    if (await this.refresh()) await this.flush();
   }
 
   async write(row) {
@@ -170,7 +199,7 @@ export class TaskSync extends EventEmitter {
   }
 
   async toggle(id) {
-    const r = this.state.rows[id];
+    const r = this.row(id);
     if (!r) return { ok: false, error: 'Task not found' };
     const done = !r.done;
     await this.write({ ...r, done, done_at: done ? this.nowISO() : null });
@@ -178,7 +207,7 @@ export class TaskSync extends EventEmitter {
   }
 
   async rename(id, rawTitle) {
-    const r = this.state.rows[id];
+    const r = this.row(id);
     if (!r) return { ok: false, error: 'Task not found' };
     const v = validateTitle(rawTitle);
     if (!v.ok) return v;
@@ -187,7 +216,7 @@ export class TaskSync extends EventEmitter {
   }
 
   async remove(id) {
-    const r = this.state.rows[id];
+    const r = this.row(id);
     if (!r) return { ok: false, error: 'Task not found' };
     await this.write({ ...r, deleted: true });
     return { ok: true };
@@ -196,7 +225,7 @@ export class TaskSync extends EventEmitter {
   async reorder(ids) {
     const ts = this.nowISO();
     ids.forEach((id, i) => {
-      const r = this.state.rows[id];
+      const r = this.row(id);
       if (r && r.position !== i + 1) this.state = applyLocal(this.state, { ...r, position: i + 1, updated_at: ts });
     });
     this.persist();

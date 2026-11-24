@@ -1,5 +1,5 @@
 // Floating Clawd — app entry. Wires sync, windows, tray, shortcut, mood and timers.
-import { app, ipcMain, Tray, Menu, nativeImage, globalShortcut, screen, safeStorage, powerMonitor } from 'electron';
+import { app, ipcMain, Tray, Menu, nativeImage, globalShortcut, screen, safeStorage, powerMonitor, dialog } from 'electron';
 import { createClient } from '@supabase/supabase-js';
 import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -132,10 +132,25 @@ function refreshTray() {
     { type: 'separator' },
     { label: 'Start with Windows', type: 'checkbox', checked: autostart, enabled: app.isPackaged,
       click: item => { app.setLoginItemSettings({ openAtLogin: item.checked }); settings.set('autostart', item.checked); } },
-    { label: 'Sign out', enabled: signedIn && !!sync, click: () => sync.signOut() },
+    { label: 'Sign out', enabled: signedIn && !!sync, click: () => signOut() },
     { type: 'separator' },
     { label: 'Quit', click: () => app.quit() },
   ]));
+}
+
+// Signing out wipes the local cache, so warn first if some edits haven't reached Supabase.
+async function signOut() {
+  const unsent = sync.pendingCount();
+  if (unsent > 0) {
+    const { response } = await dialog.showMessageBox({
+      type: 'warning', buttons: ['Sign out anyway', 'Cancel'], defaultId: 1, cancelId: 1,
+      title: 'Floating Clawd', message: `${unsent} change${unsent === 1 ? " hasn't" : "s haven't"} synced yet.`,
+      detail: 'Signing out now will lose them. Connect to the internet first to keep them.',
+    });
+    if (response !== 0) return { ok: false, error: 'Sign-out cancelled' };
+  }
+  await sync.signOut();
+  return { ok: true };
 }
 
 // ---------- IPC ----------
@@ -151,7 +166,7 @@ function wireIPC() {
   ipcMain.handle('tasks:remove', needSync((_e, id) => sync.remove(id)));
   ipcMain.handle('tasks:reorder', needSync((_e, ids) => sync.reorder(ids)));
   ipcMain.handle('auth:sign-in', needSync((_e, email, pw) => sync.signIn(email, pw)));
-  ipcMain.handle('auth:sign-out', needSync(() => sync.signOut()));
+  ipcMain.handle('auth:sign-out', needSync(() => signOut()));
 
   ipcMain.on('renderer:ready', e => {
     e.sender.send('state', lastState);
@@ -222,7 +237,7 @@ app.whenReady().then(async () => {
   if (!config) {
     broadcastState({ ...lastState, status: 'not-configured' });
   } else {
-    sync = new TaskSync({ client: makeClient(config), settings });
+    sync = new TaskSync({ client: makeClient(config), settings, clearSession: () => settings.clearSecrets('sb:') });
     sync.on('state', broadcastState);
     broadcastState(sync.snapshot());
     await sync.start();

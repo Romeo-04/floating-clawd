@@ -54,3 +54,14 @@ describe('merge', () => {
     expect(s0).toEqual({ rows: {}, pending: {} });
   });
 });
+
+describe('timestamp formats from Postgres/Realtime', () => {
+  it('compares short +00 offsets and space separators as instants', () => {
+    const local = { id: 'a', title: 'Local', updated_at: '2026-11-24T10:00:00.000Z' };
+    const state = { rows: { a: local }, pending: {} };
+    const older = { id: 'a', title: 'Stale echo', updated_at: '2026-11-24T09:00:00.123456+00' };
+    expect(mergeRemote(state, older).rows.a.title).toBe('Local');
+    const olderSpaced = { id: 'a', title: 'Stale echo', updated_at: '2026-11-24 09:00:00.123456+00' };
+    expect(mergeRemote(state, olderSpaced).rows.a.title).toBe('Local');
+  });
+});
