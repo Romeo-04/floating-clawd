@@ -35,6 +35,7 @@ drawClawds('orange');
 const swatches = [...document.querySelectorAll('.swatch')];
 swatches.forEach(b => b.addEventListener('click', () => api.setColor(b.dataset.color)));
 api.onColor(color => {
+  document.documentElement.dataset.color = color;
   drawClawds(color);
   swatches.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.color === color)));
 });

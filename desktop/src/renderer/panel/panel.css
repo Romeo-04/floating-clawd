@@ -37,7 +37,7 @@ button { background: none; border: 0; cursor: pointer; }
   background: rgba(245,239,230,.06); border: 1px solid var(--cream-line);
   transition: border-color .18s ease-out, box-shadow .18s ease-out;
 }
-.add:focus-within { border-color: rgba(217,119,87,.7); box-shadow: 0 0 0 3px rgba(217,119,87,.18); }
+.add:focus-within { border-color: rgba(var(--clawd-rgb),.7); box-shadow: 0 0 0 3px rgba(var(--clawd-rgb),.18); }
 .add-icon { color: var(--clawd); }
 .add input { flex: 1; min-width: 0; height: 100%; background: none; border: 0; outline: none; caret-color: var(--cream); }
 .add input::placeholder { color: var(--cream-3); }
@@ -66,9 +66,9 @@ kbd { margin-left: auto; font: 500 10px/1 var(--ui); color: var(--cream-3); bord
 
 .t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: text; }
 .done .t { color: var(--cream-3); text-decoration: line-through; text-decoration-color: var(--cream-3); }
-.edit { flex: 1; min-width: 0; height: 28px; margin: 0 -6px; padding: 0 6px; border-radius: 6px; border: 1px solid rgba(217,119,87,.7); background: rgba(245,239,230,.06); outline: none; }
+.edit { flex: 1; min-width: 0; height: 28px; margin: 0 -6px; padding: 0 6px; border-radius: 6px; border: 1px solid rgba(var(--clawd-rgb),.7); background: rgba(245,239,230,.06); outline: none; }
 
-.tag { flex: none; font: 400 9px/1 var(--px); letter-spacing: .04em; padding: 4px 6px; border-radius: 999px; color: var(--clawd-hi); background: rgba(217,119,87,.16); }
+.tag { flex: none; font: 400 9px/1 var(--px); letter-spacing: .04em; padding: 4px 6px; border-radius: 999px; color: var(--clawd-hi); background: rgba(var(--clawd-rgb),.16); }
 
 .grip { position: absolute; left: -4px; color: var(--cream); opacity: 0; cursor: grab; padding: 4px 0; }
 .trash { flex: none; color: var(--cream-2); display: none; padding: 2px; border-radius: 4px; }
@@ -112,7 +112,7 @@ kbd { margin-left: auto; font: 500 10px/1 var(--ui); color: var(--cream-3); bord
   background: rgba(245,239,230,.06); border: 1px solid var(--cream-line); outline: none;
   transition: border-color .18s ease-out, box-shadow .18s ease-out;
 }
-.auth input:focus { border-color: rgba(217,119,87,.7); box-shadow: 0 0 0 3px rgba(217,119,87,.18); }
+.auth input:focus { border-color: rgba(var(--clawd-rgb),.7); box-shadow: 0 0 0 3px rgba(var(--clawd-rgb),.18); }
 .primary { height: 40px; border-radius: 12px; background: var(--clawd); color: var(--ink); font-weight: 600; margin-top: 4px; transition: background-color .18s ease-out; }
 .primary:hover { background: var(--clawd-hi); }
 .primary:disabled { opacity: .6; cursor: not-allowed; }
