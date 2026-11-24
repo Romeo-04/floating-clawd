@@ -22,6 +22,7 @@ let panelOpen = false;
 let lastState = { view: { open: [], done: [], total: 0, doneCount: 0 }, status: 'signed-out' };
 let justCompletedUntil = 0;
 let dragTimer = null;
+let blurClosedAt = 0; // clicking Clawd or the tray blurs the panel first; don't let that click reopen it
 
 function loadConfig() {
   const candidates = [
@@ -87,7 +88,10 @@ function setPanel(open) {
   send('panel', open);
   updateMood();
 }
-const togglePanel = () => setPanel(!panelOpen);
+const togglePanel = () => {
+  if (!panelOpen && Date.now() - blurClosedAt < 300) return;
+  setPanel(!panelOpen);
+};
 
 // ---------- size + position ----------
 const currentSize = () => clampSize(settings.get('clawdSize') ?? SIZE_DEFAULT);
@@ -200,6 +204,7 @@ app.whenReady().then(async () => {
   clawdWin = createClawdWindow({ size: currentSize(), pos: settings.get('clawdPos') });
   panelWin = createPanelWindow();
   panelWin.on('close', e => { if (!app.isQuitting) { e.preventDefault(); setPanel(false); } });
+  panelWin.on('blur', () => { if (panelOpen) { blurClosedAt = Date.now(); setPanel(false); } });
 
   tray = new Tray(nativeImage.createFromBuffer(clawdIconPNG(32)));
   tray.on('click', togglePanel);

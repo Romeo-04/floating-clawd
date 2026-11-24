@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'">
+<title>Floating Clawd</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <main id="list-view" hidden>
+    <header class="p-head">
+      <div><div class="date" id="date"></div><h1 class="p-title">Today</h1></div>
+      <div class="p-count" id="count" aria-live="polite"></div>
+    </header>
+    <div class="seg" id="seg" aria-hidden="true"></div>
+    <p class="all-done" id="all-done" hidden>All done for today</p>
+
+    <form class="add" id="add-form" autocomplete="off">
+      <span class="add-icon" data-icon="plus"></span>
+      <input id="add-input" type="text" placeholder="What's next?" aria-label="Add a task" maxlength="400">
+      <kbd>Enter</kbd>
+    </form>
+    <p class="error" id="error" role="alert" hidden></p>
+
+    <div class="scroll">
+      <div class="empty" id="empty" hidden>
+        <div class="empty-clawd" id="empty-clawd"></div>
+        <p>Nothing yet. What's first?</p>
+      </div>
+      <ul class="tasks" id="open-list" aria-label="To do"></ul>
+      <div class="divider" id="divider" hidden></div>
+      <ul class="tasks" id="done-list" aria-label="Done"></ul>
+    </div>
+
+    <footer class="p-foot">
+      <span class="dot" id="dot"></span><span id="status"></span><kbd>Ctrl Alt Space</kbd>
+    </footer>
+  </main>
+
+  <main id="auth-view" hidden>
+    <header class="p-head">
+      <div><div class="date" id="auth-date"></div><h1 class="p-title">Sign in</h1></div>
+    </header>
+    <div class="auth-clawd" id="auth-clawd"></div>
+
+    <form class="auth" id="auth-form" autocomplete="on">
+      <label>Email<input id="email" type="email" autocomplete="username" required></label>
+      <label>Password<input id="password" type="password" autocomplete="current-password" required></label>
+      <button class="primary" id="sign-in" type="submit">Sign in</button>
+      <p class="error" id="auth-error" role="alert" hidden></p>
+    </form>
+
+    <div class="setup" id="setup" hidden>
+      <p><b>Connect Supabase first.</b></p>
+      <p>Copy <code>config.example.json</code> to <code>config.local.json</code>, fill in your project URL and anon key, then restart. Steps are in <code>supabase/SETUP.md</code>.</p>
+    </div>
+  </main>
+
+  <script type="module" src="panel.js"></script>
+</body>
+</html>
