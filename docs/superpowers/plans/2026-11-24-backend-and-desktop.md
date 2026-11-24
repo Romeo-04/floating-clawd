@@ -21,7 +21,8 @@
 - Task title: 1–200 chars after trimming.
 - "Today" = device local date `YYYY-MM-DD`. Visible = `for_date == today` OR (`!done` AND `for_date < today`), never `deleted`.
 - Conflicts: last write wins on client-stamped `updated_at`; the server ignores an update whose `updated_at` is older than the stored one.
-- Clawd window ~104×66 px sprite area, transparent, frameless, always-on-top, skip-taskbar; transparent pixels click through.
+- Clawd size is customizable (owner request 2026-11-24): sprite width 56–240 px, default 104, presets Small 72 / Medium 104 / Large 144 / Extra large 200 in the tray, and Ctrl + mouse wheel over Clawd in 8 px steps. Persisted as `clawdSize`; resizing keeps his bottom-right corner anchored.
+- Clawd window = sprite area + padding, transparent, frameless, always-on-top, skip-taskbar; transparent pixels click through.
 - Design tokens exactly as `design/mockup.html` `:root` (terracotta `#D97757`, shade `#B85C3E`, highlight `#E58A68`, ink `#1A1410`, cream `#F5EFE6`, dark glass default).
 - Global shortcut `Ctrl+Alt+Space` toggles the panel. Start with Windows on by default.
 - Clawd art is original (sprite engine from `design/mockup.html`); never copy art from other Clawd projects.
@@ -127,6 +128,7 @@ for each row execute function public.tasks_reject_stale();
 
 **Interfaces — Produces:** (Rect = `{x,y,width,height}`)
 - `panelPlacement(clawd: Rect, panel: {width,height}, workArea: Rect, gap = 12) -> { x, y, side: 'left'|'right' }`: prefer left of Clawd; right if left doesn't fit; vertically align panel bottom with Clawd bottom, then clamp inside workArea.
+- `clampSize(px: number) -> number`: rounds and clamps to 56–240.
 - `clampToWorkArea(rect: Rect, workAreas: Rect[]) -> {x,y}`: if ≥ 50% of rect lies in some area keep it (clamped fully inside it); else move to bottom-right of the primary (first) area with 24px margin.
 
 - [ ] **Step 1: Failing tests**: Clawd at right edge → side `'left'`; Clawd at x=10 → `'right'`; Clawd near top → panel y clamped to workArea.y; saved position on a removed second monitor (x=3000, areas only 0–1920) → moved to `{x:1920-104-24, ...}` primary bottom-right.
@@ -152,7 +154,7 @@ for each row execute function public.tasks_reject_stale();
 **Interfaces:**
 - Consumes: Task 2 `buildView`, `validateTitle`, `localDateISO`; Task 5 merge functions.
 - Produces:
-  - `settings.get(key)`, `settings.set(key, value)` (JSON at `app.getPath('userData')/settings.json`), `settings.getSecret(key)`, `settings.setSecret(key, value|null)` (safeStorage-encrypted). Keys: `clawdPos`, `cache` (merge state), `autostart`, secret `sb-session`.
+  - `settings.get(key)`, `settings.set(key, value)` (JSON at `app.getPath('userData')/settings.json`), `settings.getSecret(key)`, `settings.setSecret(key, value|null)` (safeStorage-encrypted). Keys: `clawdPos`, `clawdSize`, `cache` (merge state), `autostart`, secret `sb-session`.
   - `class TaskSync extends EventEmitter` — `constructor({ client, settings, now = () => new Date() })`; methods `start()`, `signIn(email, password) -> {ok, error?}`, `signOut()`, `add(title) -> {ok, error?}` (new uuid via `crypto.randomUUID()`, `for_date` today, `position` = max open + 1), `toggle(id)`, `rename(id, title)`, `remove(id)` (soft delete), `reorder(ids: string[])`, `refresh()`, `flush()`; emits `'state'` with `{ view, status: 'synced'|'syncing'|'offline'|'signed-out', lastSyncedAt }`.
   - Supabase client is created in `main.js` with `auth: { storage: { getItem/setItem/removeItem → settings secret }, persistSession: true, autoRefreshToken: true }` and injected, so tests pass a fake.
   - Realtime: `client.channel('tasks').on('postgres_changes', {event:'*', schema:'public', table:'tasks'}, p => mergeRemote(p.new))`; on `SUBSCRIBED` → `refresh()` + `flush()`.
@@ -166,11 +168,12 @@ for each row execute function public.tasks_reject_stale();
 **Files:** Create `src/main/main.js`, `src/main/windows.js`, `src/preload/preload.cjs`
 
 **Interfaces — Produces** `window.clawd` (preload, via `contextBridge`):
-`onState(cb)`, `onMood(cb)`, `add(title)`, `toggle(id)`, `rename(id,title)`, `remove(id)`, `reorder(ids)`, `signIn(email,pw)`, `signOut()`, `setIgnoreMouse(bool)`, `dragStart()`, `dragMove()`, `dragEnd()`, `clawdClick()`, `closePanel()`.
+`onState(cb)`, `onMood(cb)`, `add(title)`, `toggle(id)`, `rename(id,title)`, `remove(id)`, `reorder(ids)`, `signIn(email,pw)`, `signOut()`, `setIgnoreMouse(bool)`, `resizeBy(deltaPx)`, `onSize(cb)`, `dragStart()`, `dragMove()`, `dragEnd()`, `clawdClick()`, `closePanel()`.
 
 - Clawd window: `transparent: true, frame: false, resizable: false, skipTaskbar: true, alwaysOnTop: true` (level `'screen-saver'`), `focusable: false`, size = sprite box + 16px padding for the hop; `setIgnoreMouseEvents(true, { forward: true })` until the renderer reports it is over an opaque pixel. Drag uses `screen.getCursorScreenPoint()` in main during `dragMove` (no renderer coordinates). Saves `clawdPos` on drag end; on start and on `screen` `display-removed`/`display-metrics-changed` → `clampToWorkArea`.
 - Panel window: 340×520, `frame: false, show: false, skipTaskbar: true, alwaysOnTop: true, backgroundMaterial: 'acrylic', roundedCorners: true`, background `#00000000`. If acrylic renders badly, set `transparent: true` and rely on `.glass` CSS fallback (spec allows either). Positioned with `panelPlacement`. Hidden on Esc / Clawd click / shortcut. Not hidden on blur (v1).
-- Tray: icon from sprite; menu Show/Hide Clawd, Start with Windows (checkbox → `app.setLoginItemSettings`, default on first run), Sign out, Quit. Single-instance lock.
+- Size: `setClawdSize(px)` clamps to 56–240 (`clampSize` in `placement.js`, tested in Task 4: 30→56, 300→240, 110→110), resizes the window keeping its bottom-right corner, clamps on-screen, saves `clawdSize`, sends `'size'` to the renderer.
+- Tray: icon from sprite; menu Show/Hide Clawd, Size ▸ (Small/Medium/Large/Extra large radio items), Start with Windows (checkbox → `app.setLoginItemSettings`, default on first run), Sign out, Quit. Single-instance lock.
 - Mood loop in main: recompute `pickMood` on every state change, panel toggle, every minute, and set `justCompleted` for 1.2s after a tick; send via `'mood'`. Midnight timer: `setTimeout` to next local 00:00:05 → re-emit view; also on `powerMonitor` `resume` → `refresh()` + `flush()`.
 - [ ] **Step 1: Implement** the above. **Step 2: Verify manually** `npm start` with a filled `config.local.json`: Clawd visible bottom-right; clicking empty corners of his window hits the desktop behind; drag moves him and the position persists across restart; `Ctrl+Alt+Space` toggles the panel; tray items work.
 - [ ] **Step 3: Commit** `feat(desktop): floating Clawd window, panel window, tray, shortcut`
@@ -179,7 +182,7 @@ for each row execute function public.tasks_reject_stale();
 
 **Files:** Create `src/renderer/tokens.css`, `src/renderer/clawd/{index.html,clawd.js,clawd.css}`, `desktop/assets/fonts/*`
 
-- Renders `spriteSVG(mood, 104)`; blink: every 3–6 s (random) show `'blink'` frame for 140 ms when mood is idle/coffee/typing; `bob` (2-step, 1.2 s) always; `hop` (3-step, 0.9 s, once) on `'happy'`; `celebrate` loops hop + sparkle until mood changes. Respect `prefers-reduced-motion`.
+- Renders `spriteSVG(mood, size)` with `size` from `onSize`; `wheel` with `ctrlKey` over an opaque pixel → `resizeBy(±8)`; blink: every 3–6 s (random) show `'blink'` frame for 140 ms when mood is idle/coffee/typing; `bob` (2-step, 1.2 s) always; `hop` (3-step, 0.9 s, once) on `'happy'`; `celebrate` loops hop + sparkle until mood changes. Respect `prefers-reduced-motion`.
 - Pointer: on `mousemove` call `setIgnoreMouse(!isOpaque(...))`; `mousedown` on opaque → `dragStart`; moves → `dragMove`; `mouseup` → `dragEnd`, and if total movement < 4 px → `clawdClick`.
 - Small dot overlay when status is `'offline'` is covered by the OFFLINE mood; no extra UI.
 - [ ] **Step 1: Implement. Step 2: Verify manually**: blinking visible, tick a task → hop, finish all → celebrate, disconnect Wi-Fi → OFFLINE drop. **Step 3: Commit** `feat(desktop): animated Clawd renderer with pixel hit-testing`
